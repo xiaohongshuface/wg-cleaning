@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title data-en="End of Lease Cleaning Price List (Editable)" data-zh="搬家清洁价格表（可编辑）">
+    End of Lease Cleaning Price List (Editable)
+  </title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background-color: #f9f9f9;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 0.5rem;
+    }
+    .buttons-container {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    table {
+      max-width: 900px;
+      width: 100%;
+      margin: 0 auto;
+      border-collapse: collapse;
+      background-color: #fff;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: left;
+      vertical-align: middle;
+    }
+    th {
+      background-color: #efefef;
+    }
+    .section-title {
+      font-weight: bold;
+      background-color: #dff0d8;
+    }
+    .total {
+      font-weight: bold;
+      background-color: #fafafa;
+    }
+    input[type="text"] {
+      width: 80px;
+      border: 1px solid #ccc;
+      padding: 4px;
+    }
+    /* 按钮样式 */
+    .add-row-btn {
+      cursor: pointer;
+      display: inline-block;
+      margin: 6px;
+      padding: 6px 12px;
+      font-size: 14px;
+      color: #fff;
+      background-color: #5cb85c;
+      border: none;
+      border-radius: 4px;
+    }
+    .delete-row-btn {
+      cursor: pointer;
+      display: inline-block;
+      margin: 2px;
+      padding: 4px 8px;
+      font-size: 12px;
+      color: #fff;
+      background-color: #d9534f;
+      border: none;
+      border-radius: 4px;
+    }
+    #lang-toggle, #print-btn {
+      cursor: pointer;
+      margin: 0 10px;
+      padding: 10px 16px;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+    }
+    #lang-toggle {
+      background-color: #0275d8;
+      color: #fff;
+    }
+    #print-btn {
+      background-color: #f0ad4e;
+      color: #fff;
+    }
+
+    /* 隐藏模板 */
+    .row-template {
+      display: none;
+    }
+
+    /* 打印时隐藏操作按钮 */
+    @media print {
+      #lang-toggle, #print-btn,
+      .add-row-btn, .delete-row-btn {
+        display: none !important;
+      }
+      body {
+        margin: 0;
+        background-color: #fff;
+      }
+      table {
+        border: 1px solid #000;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1
+    data-en="End of Lease Cleaning Price List (Editable)"
+    data-zh="搬家清洁价格表（可编辑）"
+  >
+    End of Lease Cleaning Price List (Editable)
+  </h1>
+
+  <div class="buttons-container">
+    <button
+      id="lang-toggle"
+      data-en="Switch to Chinese"
+      data-zh="切换为英文"
+    >
+      Switch to Chinese
+    </button>
+    <button id="print-btn" data-en="Print" data-zh="打印">
+      Print
+    </button>
+  </div>
+
+  <!-- TABLE HEADER -->
+  <table id="main-table">
+    <thead>
+      <tr>
+        <th data-en="Area" data-zh="区域">Area</th>
+        <th data-en="Task" data-zh="任务">Task</th>
+        <th data-en="Unit Price (AUD)" data-zh="单价(澳元)">Unit Price (AUD)</th>
+        <th data-en="Qty" data-zh="数量">Qty</th>
+        <th data-en="Subtotal" data-zh="小计">Subtotal</th>
+        <th data-en="Actions" data-zh="操作">Actions</th>
+      </tr>
+    </thead>
+    <tbody id="table-body"><!-- JS渲染 --></tbody>
+    <tfoot>
+      <!-- 这里放全局合计行(3行) -->
+      <tr class="total" data-global="basic-service">
+        <td colspan="5" data-en="Total (Basic Service)" data-zh="总计(基础服务)">Total (Basic Service)</td>
+        <td>$0</td>
+      </tr>
+      <tr class="total" data-global="with-oven">
+        <td colspan="5" data-en="Total (with Oven Clean)" data-zh="总计(含烤箱)">Total (with Oven Clean)</td>
+        <td>$0</td>
+      </tr>
+      <tr class="total" data-global="all-including">
+        <td colspan="5" data-en="Total (All Including Optional Extras)" data-zh="总计(含所有可选项目)">Total (All Including Optional Extras)</td>
+        <td>$0</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <!-- SECTION TEMPLATES for new row -->
+  <template id="row-template" class="row-template">
+    <!-- 一个tr，用JS克隆后填充内容 -->
+    <tr>
+      <td><!-- area --></td>
+      <td><!-- task --></td>
+      <td><input type="text"/></td>
+      <td><input type="text"/></td>
+      <td></td>
+      <td>
+        <button class="delete-row-btn" data-en="Delete" data-zh="删除">Delete</button>
+      </td>
+    </tr>
+  </template>
+
+  <script>
+  // ===== 数据结构：分区 + 行项目 =====
+  // 我们把所有默认表格都存为 JSON；若 localStorage 有数据，则用 localStorage 恢复
+  const defaultData = [
+    {
+      sectionId: 'bedroom_living',
+      sectionEn: 'Bedroom & Living Room',
+      sectionZh: '卧室和客厅',
+      rows: [
+        {
+          areaEn: 'Bedroom/Living',
+          areaZh: '卧室/客厅',
+          taskEn: 'Floor Cleaning (Vacuum/Mop)',
+          taskZh: '地板清洁(吸尘/拖地)',
+          price: 30,
+          qty: 2,
+        },
+        {
+          areaEn: '',
+          areaZh: '',
+          taskEn: 'Surface Wipe',
+          taskZh: '擦拭表面',
+          price: 20,
+          qty: 2,
+        },
+        {
+          areaEn: '',
+          areaZh: '',
+          taskEn: 'Wardrobe Inside/Outside',
+          taskZh: '衣柜内外清洁',
+          price: 15,
+          qty: 2,
+        },
+        {
+          areaEn: '',
+          areaZh: '',
+          taskEn: 'Skirting/Doorframe/Windowsill',
+          taskZh: '踢脚线/门框/窗台',
+          price: 15,
+          qty: 2,
+        },
+        {
+          areaEn: '',
+          areaZh: '',
+          taskEn: 'Wall Spot Cleaning',
+          taskZh: '墙面局部清洁',
+          price: 10,
+          qty: 2,
+        },
+      ],
+      subtotal: 180
+    },
+    {
+      sectionId: 'kitchen',
+      sectionEn: 'Kitchen',
+      sectionZh: '厨房',
+      rows: [
+        {
+          areaEn: 'Kitchen',
+          areaZh: '厨房',
+          taskEn: 'Benchtop + Exterior Cabinet',
+          taskZh: '台面+橱柜外部',
+          price: 25,
+          qty: 1,
+        },
+        {
+          areaEn: '',
+          areaZh: '',
+          taskEn: 'Interior Cabinet (Empty)',
+          taskZh: '橱柜内部(空)',
+          price: 15,
+          qty: 1,
+        },
+        {
+          areaEn: '',
+          areaZh: '',
+          taskEn: 'Sink & Tap',
+          taskZh: '水槽&水龙头',
+          price: 10,
+          qty: 1,
+        },
+        {
+          areaEn: '',
+          areaZh: '',
+          taskEn: 'Stovetop + Rangehood Exterior',
+          taskZh: '炉灶+抽油烟机外部',
+          price: 20,
+          qty: 1,
+        },
+        {
+          areaEn: '',
+          areaZh: '',
+          taskEn: 'Oven Exterior',
+          taskZh: '烤箱外部',
+          price: 10,
+          qty: 1,
+        },
+        {
+          areaEn: '',
+          areaZh: '',
+          taskEn: 'Microwave (In & Out)',
+          taskZh: '微波炉(内外)',
+          price: 20,
+          qty: 1,
+        },
+        {
+          areaEn: '',
+          areaZh: '',
+          taskEn: 'Fridge Exterior',
+          taskZh: '冰箱外部',
+          price: 10,
+          qty: 1,
+        },
+        {
+          areaEn: '',
+          areaZh: '',
+          taskEn: 'Fridge Interior (If Empty)',
+          taskZh: '冰箱内部(空)',
+          price: 20,
+          qty: 1,
+        },
+      ],
+      subtotal: 130
+    },
+    {
+      sectionId: 'optional_addon',
+      sectionEn: 'Optional Add-on',
+      sectionZh: '可选附加项',
+      rows: [
+        {
+          areaEn: 'Kitchen',
+          areaZh: '厨房',
+          taskEn: 'Oven Internal Deep Clean',
+          taskZh: '烤箱内部深度清洁',
+          price: 60,
+          qty: 1
+        },
+      ],
+      subtotal: 60
+    },
+    {
+      sectionId: 'bathroom_laundry',
+      sectionEn: 'Bathroom & Laundry',
+      sectionZh: '浴室和洗衣房',
+      rows: [
+        {
+          areaEn: 'Bathroom',
+          areaZh: '浴室',
+          taskEn: 'Toilet + Basin',
+          taskZh: '马桶+洗手盆',
+          price: 20,
+          qty: 1
+        },
+        {
+          areaEn: '',
+          areaZh: '',
+          taskEn: 'Mirror',
+          taskZh: '镜子',
+          price: 10,
+          qty: 1
+        },
+        {
+          areaEn: '',
+          areaZh: '',
+          taskEn: 'Shower Glass + Wall Tile',
+          taskZh: '淋浴玻璃+墙面瓷砖',
+          price: 30,
+          qty: 1
+        },
+        {
+          areaEn: '',
+          areaZh: '',
+          taskEn: 'Floor + Drain',
+          taskZh: '地面+排水',
+          price: 10,
+          qty: 1
+        },
+        {
+          areaEn: 'Laundry',
+          areaZh: '洗衣房',
+          taskEn: 'Washer/Dryer Exterior',
+          taskZh: '洗衣机/烘干机外部',
+          price: 10,
+          qty: 1
+        }
+      ],
+      subtotal: 80
+    },
+    {
+      sectionId: 'optional_extras',
+      sectionEn: 'Optional Extras',
+      sectionZh: '可选额外项',
+      rows: [
+        {
+          areaEn: 'Balcony',
+          areaZh: '阳台',
+          taskEn: 'Balcony Floor + Railing',
+          taskZh: '阳台地面+扶栏',
+          price: 25,
+          qty: 1
+        },
+        {
+          areaEn: 'Windows',
+          areaZh: '窗户',
+          taskEn: 'Glass Window / Balcony Door',
+          taskZh: '玻璃窗/阳台门',
+          price: 30,
+          qty: 1
+        },
+        {
+          areaEn: 'General',
+          areaZh: '通用',
+          taskEn: 'Switches / Door Handles',
+          taskZh: '开关/门把手',
+          price: 10,
+          qty: 1
+        }
+      ],
+      subtotal: 65
+    }
+  ];
+
+  // 用来存储并渲染数据的全局数组
+  let cleaningData = [];
+
+  // ============ 主逻辑 =============
+
+  // 1) 页面加载：先尝试从localStorage恢复；若没有，则用default
+  loadFromStorageOrDefault();
+  // 2) 渲染表格
+  renderTable();
+  // 3) 绑定语言/打印按钮
+  setupUIEvents();
+  // 4) 计算所有小计+总计
+  recalcAll();
+
+  // ============ 函数定义 =============
+
+  // 从localStorage或默认数据加载
+  function loadFromStorageOrDefault() {
+    const saved = localStorage.getItem('cleaning_list_data');
+    if (saved) {
+      try {
+        cleaningData = JSON.parse(saved);
+      } catch(e) {
+        console.warn('localStorage parse error, fallback to defaultData');
+        cleaningData = JSON.parse(JSON.stringify(defaultData));
+      }
+    } else {
+      // 初次使用 => 拷贝 defaultData
+      cleaningData = JSON.parse(JSON.stringify(defaultData));
+    }
+  }
+
+  // 把 cleaningData 存进 localStorage
+  function saveToStorage() {
+    localStorage.setItem('cleaning_list_data', JSON.stringify(cleaningData));
+  }
+
+  // 根据 cleaningData 渲染表格
+  function renderTable() {
+    const tbody = document.getElementById('table-body');
+    tbody.innerHTML = ''; // 清空
+    // 按顺序渲染每个 section
+    cleaningData.forEach(section => {
+      // 创建 section-title 行
+      const secRow = document.createElement('tr');
+      secRow.classList.add('section-title');
+      secRow.setAttribute('data-section', section.sectionId);
+      secRow.innerHTML = `
+        <td colspan="6">
+          <span data-en="${section.sectionEn}" data-zh="${section.sectionZh}">${section.sectionEn}</span>
+          <button
+            class="add-row-btn"
+            data-en="Add Row"
+            data-zh="添加行"
+          >
+            Add Row
+          </button>
+        </td>
+      `;
+      tbody.appendChild(secRow);
+
+      // 渲染本节的所有行
+      section.rows.forEach(rowObj => {
+        const rowEl = makeRowEl(section.sectionId, rowObj);
+        tbody.appendChild(rowEl);
+      });
+
+      // 小计行
+      const totalRow = document.createElement('tr');
+      totalRow.classList.add('total');
+      totalRow.setAttribute('data-section', section.sectionId);
+      totalRow.innerHTML = `
+        <td colspan="5" data-en="${section.sectionEn} Subtotal" data-zh="${section.sectionZh}小计">
+          ${section.sectionEn} Subtotal
+        </td>
+        <td>$0</td>
+      `;
+      tbody.appendChild(totalRow);
+    });
+  }
+
+  // 创建一个tr元素（行），根据 rowObj 数据
+  function makeRowEl(sectionId, rowObj) {
+    const tr = document.createElement('tr');
+
+    // DOM结构与 <template id="row-template"> 类似
+    tr.innerHTML = `
+      <td data-en="${rowObj.areaEn || ''}" data-zh="${rowObj.areaZh || ''}">
+        ${rowObj.areaEn || ''}
+      </td>
+      <td data-en="${rowObj.taskEn}" data-zh="${rowObj.taskZh}">
+        ${rowObj.taskEn}
+      </td>
+      <td><input type="text" /></td>
+      <td><input type="text" /></td>
+      <td></td>
+      <td>
+        <button class="delete-row-btn" data-en="Delete" data-zh="删除">Delete</button>
+      </td>
+    `;
+    // 给input赋值
+    const inputs = tr.querySelectorAll('input');
+    inputs[0].value = `$${rowObj.price || 0}`;
+    inputs[1].value = rowObj.qty || 0;
+
+    // 绑定“Delete”按钮
+    const delBtn = tr.querySelector('.delete-row-btn');
+    delBtn.addEventListener('click', () => {
+      // 找到 cleaningData中对应section, 删掉这个 rowObj
+      const sectionIdx = cleaningData.findIndex(sec => sec.sectionId === sectionId);
+      if (sectionIdx >= 0) {
+        const rowsArr = cleaningData[sectionIdx].rows;
+        const rowIndex = rowsArr.indexOf(rowObj);
+        if (rowIndex >= 0) {
+          rowsArr.splice(rowIndex, 1); // remove from array
+        }
+      }
+      // 从DOM移除行
+      tr.remove();
+      // 保存 并 重新计算
+      saveToStorage();
+      recalcAll();
+    });
+
+    // 绑定 input 事件
+    inputs.forEach((inp, i) => {
+      inp.addEventListener('input', () => {
+        const val = (i === 0) ? inp.value.replace('$','') : inp.value; // price or qty
+        const numVal = parseFloat(val) || 0;
+        if (i === 0) {
+          rowObj.price = numVal;
+        } else {
+          rowObj.qty = numVal;
+        }
+        // save + recalc
+        saveToStorage();
+        recalcAll();
+      });
+    });
+
+    return tr;
+  }
+
+  // 重新计算所有分区小计 + 全局总计
+  function recalcAll() {
+    let bedroomLivingTotal = 0;
+    let kitchenTotal = 0;
+    let bathroomLaundryTotal = 0;
+    let optionalAddonTotal = 0;
+    let optionalExtrasTotal = 0;
+
+    cleaningData.forEach(section => {
+      // 逐行计算
+      let sum = 0;
+      section.rows.forEach(r => {
+        sum += (r.price || 0) * (r.qty || 0);
+      });
+      // 更新 DOM => 小计行
+      const trSubtotal = document.querySelector(`tr.total[data-section="${section.sectionId}"] td:last-child`);
+      if (trSubtotal) {
+        trSubtotal.textContent = '$' + sum.toFixed(2);
+      }
+      // 保存到 data 里
+      section.subtotal = sum;
+
+      // 根据 sectionId 赋值
+      switch(section.sectionId) {
+        case 'bedroom_living': bedroomLivingTotal = sum; break;
+        case 'kitchen': kitchenTotal = sum; break;
+        case 'bathroom_laundry': bathroomLaundryTotal = sum; break;
+        case 'optional_addon': optionalAddonTotal = sum; break;
+        case 'optional_extras': optionalExtrasTotal = sum; break;
+      }
+    });
+
+    // 计算 Global totals
+    // Basic Service = bedroom + kitchen + bathroom
+    const basicService = bedroomLivingTotal + kitchenTotal + bathroomLaundryTotal;
+    // with Oven = basic + optional_addon
+    const withOven = basicService + optionalAddonTotal;
+    // all including = withOven + optional_extras
+    const allIncluding = withOven + optionalExtrasTotal;
+
+    // 写入DOM
+    updateGlobalTotal('basic-service', basicService);
+    updateGlobalTotal('with-oven', withOven);
+    updateGlobalTotal('all-including', allIncluding);
+  }
+
+  // 更新全局合计行
+  function updateGlobalTotal(globalId, val) {
+    const tr = document.querySelector(`tr.total[data-global="${globalId}"] td:last-child`);
+    if (tr) {
+      tr.textContent = '$' + val.toFixed(2);
+    }
+  }
+
+  // 设置语言按钮 & 打印按钮
+  function setupUIEvents() {
+    // 切换语言
+    const langBtn = document.getElementById('lang-toggle');
+    langBtn.addEventListener('click', () => {
+      const isEn = (document.documentElement.lang === 'en');
+      document.documentElement.lang = isEn ? 'zh' : 'en';
+      // 同时切换 data-en/data-zh
+      document.querySelectorAll('[data-en][data-zh]').forEach(el => {
+        el.textContent = isEn ? el.dataset.zh : el.dataset.en;
+      });
+    });
+
+    // 打印
+    const printBtn = document.getElementById('print-btn');
+    printBtn.addEventListener('click', () => {
+      window.print();
+    });
+
+    // 每个区块的“Add Row”按钮 => 在renderTable()时绑定
+    // 这里再给它们统一加监听
+    document.getElementById('main-table').addEventListener('click', (ev) => {
+      if (ev.target.classList.contains('add-row-btn')) {
+        // 找到 parent tr 或 parent section
+        const tr = ev.target.closest('tr.section-title');
+        if (!tr) return;
+        const sectionId = tr.dataset.section;
+        // 在 cleaningData 中添加一个行对象
+        const sectionObj = cleaningData.find(s => s.sectionId === sectionId);
+        if (sectionObj) {
+          const newRowObj = {
+            areaEn: '',
+            areaZh: '',
+            taskEn: '',
+            taskZh: '',
+            price: 0,
+            qty: 0
+          };
+          sectionObj.rows.push(newRowObj);
+          // 重新渲染并保存
+          saveToStorage();
+          renderTable();
+          recalcAll();
+          // 重新给table中按钮绑定事件
+          // 不过我们在renderTable()里已经做了 => so ok
+        }
+      }
+    });
+  }
+  </script>
+</body>
+</html>
